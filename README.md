@@ -14,7 +14,7 @@
 <!-- TITLE -->
 
 <div align="center">
-  <h1>WristSense</h1>
+  <h1>WristSense (BLE Vision Band)</h1>
   <p><strong>Embedded BLE Vision System with Haptic Feedback</strong></p>
 
   <p>
@@ -31,15 +31,15 @@
 
 ## 📌 Overview
 
-WristSense is a wearable embedded system designed to explore **on-device perception in resource-constrained environments**.
+WristSense is a wearable embedded system designed to explore on-device perception in resource-constrained environments.
 
-Motivated by the limitations of the Even Realities G2 Frames—specifically the lack of an integrated camera—this project introduces a modular vision pipeline paired with a non-visual feedback interface.
+Motivated by the limitations of the Even Realities G2 Frames—specifically the lack of an integrated camera—this project implements a modular vision pipeline paired with a haptic feedback interface for real-time, non-visual interaction.
 
 ---
 
 ## 🧠 System Architecture
 
-```
+```bash
 [Camera] → [nRF5340 MCU] → [Processing / ML] → [DRV2605L] → [Vibration Motor]
                                ↓
                              [BLE]
@@ -52,7 +52,7 @@ Motivated by the limitations of the Even Realities G2 Frames—specifically the 
 
 ---
 
-## 🔧 Hardware
+## 🔧 Hardware Components
 
 * NRF5340-DK — main MCU + BLE
 * Arducam Mega 5MP SPI Camera — image capture
@@ -63,7 +63,18 @@ Motivated by the limitations of the Even Realities G2 Frames—specifically the 
 
 ---
 
-## ⚙️ Software
+## 📦 Bill of Materials (BOM)
+
+A detailed breakdown of all components, costs, and sourcing is available below:
+
+👉 [View BOM (Google Sheet)](PASTE_YOUR_LINK_HERE)
+
+* Includes part numbers, suppliers, and prototyping cost (~$187)
+* Documents full hardware stack for reproducibility
+
+---
+
+## ⚙️ Software Stack
 
 * Embedded firmware (C/C++)
 * SPI image acquisition pipeline
@@ -79,6 +90,7 @@ Motivated by the limitations of the Even Realities G2 Frames—specifically the 
 * Real-time haptic feedback output
 * BLE-enabled communication interface
 * Fully self-contained wearable prototype
+* End-to-end embedded system (hardware + firmware integration)
 
 ---
 
@@ -110,7 +122,7 @@ Motivated by the limitations of the Even Realities G2 Frames—specifically the 
 ### Installation
 
 ```bash
-git clone https://github.com/yourusername/wrist-sense-embedded-vision.git
+git clone https://github.com/Toshiyuki037/BLE-Vision-Band.git
 ```
 
 1. Open firmware in IDE
@@ -122,7 +134,7 @@ git clone https://github.com/yourusername/wrist-sense-embedded-vision.git
 
 ## 📁 Project Structure
 
-```
+```bash
 /firmware      → Embedded code  
 /hardware      → Schematics / BOM  
 /docs          → Design notes  
@@ -156,10 +168,10 @@ Distributed under the MIT License.
 ## 📬 Contact
 
 Your Name
-GitHub: https://github.com/yourusername
+GitHub: https://github.com/Toshiyuki037
 
 Project Link:
-https://github.com/yourusername/wrist-sense-embedded-vision
+https://github.com/Toshiyuki037/BLE-Vision-Band
 
 ---
 
