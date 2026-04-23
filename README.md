@@ -67,7 +67,7 @@ Motivated by the limitations of the Even Realities G2 Frames—specifically the 
 
 A detailed breakdown of all components, costs, and sourcing is available below:
 
-👉 [View BOM (Google Sheet)](PASTE_YOUR_LINK_HERE)
+👉 [View BOM (Google Sheet)](https://docs.google.com/spreadsheets/d/1EQedtdF9KUZCxSDgVT32OZnp6HhoeuN5VWY41QO01Ro/edit?usp=sharing)
 
 * Includes part numbers, suppliers, and prototyping cost (~$187)
 * Documents full hardware stack for reproducibility
