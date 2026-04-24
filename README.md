@@ -14,7 +14,7 @@
 <!-- TITLE -->
 
 <div align="center">
-  <h1>WristSense (BLE Vision Band)</h1>
+  <h1>WBLE Vision Band</h1>
   <p><strong>Embedded BLE Vision System with Haptic Feedback</strong></p>
 
   <p>
@@ -31,7 +31,7 @@
 
 ## 📌 Overview
 
-WristSense is a wearable embedded system designed to explore on-device perception in resource-constrained environments.
+Vision-Band is a wearable embedded system designed to explore on-device perception in resource-constrained environments.
 
 Motivated by the limitations of the Even Realities G2 Frames—specifically the lack of an integrated camera—this project implements a modular vision pipeline paired with a haptic feedback interface for real-time, non-visual interaction.
 
