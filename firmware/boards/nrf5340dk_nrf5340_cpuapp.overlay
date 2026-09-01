@@ -13,6 +13,10 @@
 		vision-red = &vision_red;
 		vision-green = &vision_green;
 		vision-blue = &vision_blue;
+		power-led1 = &power_led1;
+		power-led2 = &power_led2;
+		power-led3 = &power_led3;
+		power-led4 = &power_led4;
 	};
 
 	leds {
@@ -31,6 +35,29 @@
 		vision_blue: vision_blue {
 			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
 			label = "Vision RGB Blue";
+		};
+	};
+	power_leds {
+		compatible = "gpio-leds";
+
+		power_led1: power_led_1 {
+			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+			label = "Power LED 1";
+		};
+
+		power_led2: power_led_2 {
+			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
+			label = "Power LED 2";
+		};
+
+		power_led3: power_led_3 {
+			gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
+			label = "Power LED 3";
+		};
+
+		power_led4: power_led_4 {
+			gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
+			label = "Power LED 4";
 		};
 	};
 };
