@@ -1,0 +1,9 @@
+&arduino_i2c {
+	status = "okay";
+
+	drv2605l: drv2605l@5a {
+		compatible = "ti,drv2605";
+		reg = <0x5a>;
+		actuator-mode = "ERM";
+	};
+};
