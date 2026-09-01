@@ -6,4 +6,5 @@ project(vision_band)
 target_sources(app PRIVATE
     src/main.c
     src/haptics.c
+    src/rgb_led.c
 )
