@@ -71,3 +71,31 @@
 		actuator-mode = "ERM";
 	};
 };
+&pinctrl {
+    camera_spi_default: camera_spi_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK,  1, 8)>,
+                    <NRF_PSEL(SPIM_MOSI, 1, 7)>,
+                    <NRF_PSEL(SPIM_MISO, 1, 6)>;
+        };
+    };
+
+    camera_spi_sleep: camera_spi_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK,  1, 8)>,
+                    <NRF_PSEL(SPIM_MOSI, 1, 7)>,
+                    <NRF_PSEL(SPIM_MISO, 1, 6)>;
+            low-power-enable;
+        };
+    };
+};
+
+&spi4 {
+    compatible = "nordic,nrf-spim";
+    status = "okay";
+
+    pinctrl-0 = <&camera_spi_default>;
+    pinctrl-1 = <&camera_spi_sleep>;
+    pinctrl-names = "default", "sleep";
+
+};
