@@ -8,4 +8,6 @@ target_sources(app PRIVATE
     src/haptics.c
     src/rgb_led.c
     src/power_leds.c
+    src/camera.c
+    src/ble_service.c
 )

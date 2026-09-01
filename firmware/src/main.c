@@ -8,6 +8,7 @@
 #include "power_leds.h"
 #include "rgb_led.h"
 #include "camera.h"
+#include "ble_service.h"
 
 
 #define BUTTON_NODE DT_ALIAS(sw0)
@@ -56,6 +57,47 @@ static void wait_for_stable_button_release(void)
 
 /*
  * ------------------------------------------------------------------
+ * BLE connection-state callback.
+ *
+ * The RGB status LED is only allowed to show BLE state while the
+ * logical Vision Band power state is ON.
+ *
+ * OFF   -> RGB off
+ * ON + disconnected -> white
+ * ON + connected    -> blue
+ * ------------------------------------------------------------------
+ */
+static void handle_ble_connection_changed(bool connected)
+{
+    if (!system_on) {
+
+        rgb_led_off();
+
+        return;
+    }
+
+
+    if (connected) {
+
+        rgb_led_blue();
+
+        printk(
+            "Status LED: BLUE (BLE connected)\n"
+        );
+    }
+    else {
+
+        rgb_led_white();
+
+        printk(
+            "Status LED: WHITE (BLE disconnected)\n"
+        );
+    }
+}
+
+
+/*
+ * ------------------------------------------------------------------
  * Capture one image only when the Vision Band is logically powered on.
  *
  * The camera itself is initialized once at boot. A short BUTTON1 press
@@ -96,7 +138,15 @@ static void handle_short_press(void)
      * Keep the ON indicators asserted while the camera is working.
      */
     power_leds_all_on();
-    rgb_led_white();
+
+    if (ble_service_is_connected()) {
+
+        rgb_led_blue();
+    }
+    else {
+
+        rgb_led_white();
+    }
 
 
     printk(
@@ -117,7 +167,15 @@ static void handle_short_press(void)
          * The logical system remains ON even if a capture fails.
          */
         power_leds_all_on();
-        rgb_led_white();
+
+        if (ble_service_is_connected()) {
+
+            rgb_led_blue();
+        }
+        else {
+
+            rgb_led_white();
+        }
 
         return;
     }
@@ -132,7 +190,15 @@ static void handle_short_press(void)
      * Restore normal powered-on indicators.
      */
     power_leds_all_on();
-    rgb_led_white();
+
+    if (ble_service_is_connected()) {
+
+        rgb_led_blue();
+    }
+    else {
+
+        rgb_led_white();
+    }
 }
 
 
@@ -200,6 +266,26 @@ int main(void)
     printk(
         "Camera interface initialized\n"
     );
+
+
+    /*
+     * ==============================================================
+     * Bluetooth
+     * ==============================================================
+     */
+
+    if (
+        ble_service_init(
+            handle_ble_connection_changed
+        ) < 0
+    ) {
+
+        printk(
+            "BLE init failed\n"
+        );
+
+        return 0;
+    }
 
 
     /*
@@ -341,7 +427,23 @@ int main(void)
                             true;
 
                         power_leds_all_on();
-                        rgb_led_white();
+
+                        if (ble_service_is_connected()) {
+
+                            rgb_led_blue();
+
+                            printk(
+                                "Status LED: BLUE (BLE connected)\n"
+                            );
+                        }
+                        else {
+
+                            rgb_led_white();
+
+                            printk(
+                                "Status LED: WHITE (BLE disconnected)\n"
+                            );
+                        }
 
 
                         printk(
@@ -423,7 +525,15 @@ int main(void)
                     if (system_on) {
 
                         power_leds_all_on();
-                        rgb_led_white();
+
+                        if (ble_service_is_connected()) {
+
+                            rgb_led_blue();
+                        }
+                        else {
+
+                            rgb_led_white();
+                        }
                     }
                     else {
 
