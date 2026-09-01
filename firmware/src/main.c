@@ -280,11 +280,13 @@ int main(void)
         ) < 0
     ) {
 
+        /*
+         * BLE failure must not kill the button/camera runtime.
+         * The Vision Band can still operate locally.
+         */
         printk(
-            "BLE init failed\n"
+            "BLE init failed; continuing without BLE\n"
         );
-
-        return 0;
     }
 
 
@@ -427,23 +429,7 @@ int main(void)
                             true;
 
                         power_leds_all_on();
-
-                        if (ble_service_is_connected()) {
-
-                            rgb_led_blue();
-
-                            printk(
-                                "Status LED: BLUE (BLE connected)\n"
-                            );
-                        }
-                        else {
-
-                            rgb_led_white();
-
-                            printk(
-                                "Status LED: WHITE (BLE disconnected)\n"
-                            );
-                        }
+                        rgb_led_white();
 
 
                         printk(
@@ -453,11 +439,34 @@ int main(void)
                         printk(
                             "Camera short-press capture enabled\n"
                         );
+
+
+                        /*
+                         * Logical power ON is what makes the product
+                         * discoverable/connectable over BLE.
+                         */
+                        if (
+                            ble_service_start() < 0
+                        ) {
+
+                            printk(
+                                "BLE could not start; local operation remains available\n"
+                            );
+                        }
                     }
                     else {
 
+                        /*
+                         * Set logical power OFF before requesting the
+                         * BLE disconnect so its callback keeps the RGB
+                         * LED off and does not restart advertising.
+                         */
                         system_on =
                             false;
+
+
+                        (void)ble_service_stop();
+
 
                         power_leds_off();
                         rgb_led_off();
