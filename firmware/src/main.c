@@ -9,6 +9,7 @@
 #include "rgb_led.h"
 #include "camera.h"
 #include "ble_service.h"
+#include "haptics.h"
 
 
 #define BUTTON_NODE DT_ALIAS(sw0)
@@ -84,6 +85,15 @@ static void handle_ble_connection_changed(bool connected)
         printk(
             "Status LED: BLUE (BLE connected)\n"
         );
+
+        /*
+         * Phase 6D:
+         * Connection confirmation is queued to the dedicated haptic
+         * worker thread. It never blocks the BLE callback.
+         */
+        (void)haptics_play(
+            HAPTIC_EVENT_BLE_CONNECTED
+        );
     }
     else {
 
@@ -98,12 +108,71 @@ static void handle_ble_connection_changed(bool connected)
 
 /*
  * ------------------------------------------------------------------
+ * Camera -> BLE transport bridge.
+ *
+ * Camera code knows nothing about GATT.
+ * BLE code knows nothing about Arducam.
+ * main.c connects the two subsystems.
+ * ------------------------------------------------------------------
+ */
+
+static int camera_ble_begin(
+    uint32_t fifo_length,
+    void *context
+)
+{
+    ARG_UNUSED(context);
+
+    return ble_service_image_begin(
+        fifo_length
+    );
+}
+
+
+static int camera_ble_write(
+    const uint8_t *data,
+    size_t length,
+    void *context
+)
+{
+    ARG_UNUSED(context);
+
+    return ble_service_image_send(
+        data,
+        length
+    );
+}
+
+
+static int camera_ble_end(
+    uint32_t jpeg_length,
+    void *context
+)
+{
+    ARG_UNUSED(context);
+
+    return ble_service_image_end(
+        jpeg_length
+    );
+}
+
+
+static const struct camera_stream_sink ble_camera_sink = {
+    .begin = camera_ble_begin,
+    .write = camera_ble_write,
+    .end = camera_ble_end,
+    .context = NULL
+};
+
+
+/*
+ * ------------------------------------------------------------------
  * Capture one image only when the Vision Band is logically powered on.
  *
  * The camera itself is initialized once at boot. A short BUTTON1 press
  * while system_on == true performs:
  *
- *      autofocus -> one 5MP capture -> JPEG export over COM4
+ *      autofocus -> one 5MP capture -> JPEG stream over BLE
  *
  * No boot-time capture is performed.
  * ------------------------------------------------------------------
@@ -134,33 +203,69 @@ static void handle_short_press(void)
     }
 
 
+    if (!ble_service_is_connected()) {
+
+        printk(
+            "Capture ignored: BLE central is not connected\n"
+        );
+
+        (void)haptics_play(
+            HAPTIC_EVENT_ERROR
+        );
+
+        return;
+    }
+
+
+    if (!ble_service_image_ready()) {
+
+        printk(
+            "Capture ignored: BLE image receiver is not subscribed\n"
+        );
+
+        (void)haptics_play(
+            HAPTIC_EVENT_ERROR
+        );
+
+        return;
+    }
+
+
     /*
      * Keep the ON indicators asserted while the camera is working.
      */
     power_leds_all_on();
-
-    if (ble_service_is_connected()) {
-
-        rgb_led_blue();
-    }
-    else {
-
-        rgb_led_white();
-    }
+    rgb_led_blue();
 
 
     printk(
-        "BUTTON1 short press: starting camera capture\n"
+        "BUTTON1 short press: starting BLE camera capture\n"
+    );
+
+    /*
+     * Immediate tactile acknowledgement that the short press was
+     * accepted. The haptic runs asynchronously while autofocus/capture
+     * begins.
+     */
+    (void)haptics_play(
+        HAPTIC_EVENT_CAPTURE_ACCEPTED
     );
 
 
-    ret = camera_capture_and_dump();
+    ret =
+        camera_capture_and_stream(
+            &ble_camera_sink
+        );
 
     if (ret < 0) {
 
         printk(
             "Camera capture/export failed: %d\n",
             ret
+        );
+
+        (void)haptics_play(
+            HAPTIC_EVENT_ERROR
         );
 
         /*
@@ -183,6 +288,14 @@ static void handle_short_press(void)
 
     printk(
         "Camera capture/export complete\n"
+    );
+
+    /*
+     * camera_capture_and_stream() only returns success after the JPEG
+     * END frame has been handed successfully to the BLE transport.
+     */
+    (void)haptics_play(
+        HAPTIC_EVENT_IMAGE_SENT
     );
 
 
@@ -238,6 +351,28 @@ int main(void)
         );
 
         return 0;
+    }
+
+
+    /*
+     * ==============================================================
+     * Haptics
+     * ==============================================================
+     *
+     * The DRV2605L worker owns vibration timing on its own Zephyr
+     * thread. Camera/BLE code only enqueue semantic haptic events.
+     */
+
+    if (haptics_init() < 0) {
+
+        /*
+         * Haptics are user feedback, not a prerequisite for camera/BLE
+         * operation. Keep the rest of the Vision Band alive if the
+         * motor driver is temporarily unavailable.
+         */
+        printk(
+            "Haptics init failed; continuing without vibration\n"
+        );
     }
 
 

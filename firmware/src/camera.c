@@ -39,7 +39,7 @@ static const struct gpio_dt_spec camera_cs = {
 };
 
 static const struct spi_config camera_spi_cfg = {
-    .frequency = 1000000,
+    .frequency = 4000000,
     .operation = SPI_OP_MODE_MASTER |
                  SPI_TRANSFER_MSB |
                  SPI_WORD_SET(8),
@@ -116,7 +116,25 @@ static const struct spi_config camera_spi_cfg = {
 #define CAMERA_IDLE_TIMEOUT_MS      3000
 #define CAMERA_CAPTURE_TIMEOUT_MS   8000
 #define CAMERA_AF_TIMEOUT_MS        4000
-#define CAMERA_CHUNK_SIZE           128
+#define CAMERA_CHUNK_SIZE           239
+
+/*
+ * Phase 6C.5:
+ * Match the camera FIFO chunk directly to one maximum JPEG DATA payload.
+ *
+ * Negotiated ATT MTU = 247:
+ *   notification value capacity = 244 bytes
+ *   Vision Band DATA header      =   5 bytes
+ *   JPEG payload                 = 239 bytes
+ *
+ * Reading exactly 239 bytes at a time avoids the 1024-byte burst pattern
+ * (239 + 239 + 239 + 239 + 68) that reduced BLE scheduling efficiency.
+ * At 4 MHz SPI, a 239-byte FIFO block is only about 0.48 ms of raw SPI time,
+ * so the application can alternate camera-read -> one full BLE notification
+ * at a much finer cadence.
+ */
+static uint8_t camera_fifo_tx_buffer[CAMERA_CHUNK_SIZE];
+static uint8_t camera_fifo_rx_buffer[CAMERA_CHUNK_SIZE];
 
 static uint8_t camera_sensor_id = 0;
 
@@ -650,13 +668,13 @@ static int camera_read_fifo(
     camera_fifo_callback_t callback,
     void *context)
 {
-    uint8_t tx[CAMERA_CHUNK_SIZE];
-    uint8_t rx[CAMERA_CHUNK_SIZE];
+    uint8_t *tx = camera_fifo_tx_buffer;
+    uint8_t *rx = camera_fifo_rx_buffer;
     uint32_t remaining = length;
     uint32_t total_read = 0;
     bool first_burst = true;
 
-    memset(tx, 0x00, sizeof(tx));
+    memset(tx, 0x00, CAMERA_CHUNK_SIZE);
 
     while (remaining > 0) {
         size_t chunk = remaining > CAMERA_CHUNK_SIZE
@@ -698,6 +716,20 @@ static int camera_read_fifo(
 
         total_read += chunk;
         remaining -= chunk;
+
+        /*
+         * Callback return value:
+         *   < 0  error
+         *   = 0  continue
+         *   > 0  clean early stop
+         *
+         * The BLE JPEG streamer uses the positive return path once the
+         * real JPEG EOI marker (FF D9) is reached so Arducam FIFO
+         * padding is never sent over the radio.
+         */
+        if (ret > 0) {
+            return 0;
+        }
     }
 
     return 0;
@@ -1077,6 +1109,327 @@ int camera_capture_and_dump(void)
 
     printk("5MP JPEG export complete\n");
     printk("==================================\n");
+
+    return 0;
+}
+
+
+/*
+ * ------------------------------------------------------------------
+ * Transport-independent JPEG streaming
+ * ------------------------------------------------------------------
+ */
+
+struct camera_transport_stream_state {
+    const struct camera_stream_sink *sink;
+
+    uint32_t bytes_sent;
+
+    uint8_t previous_byte;
+
+    bool previous_valid;
+    bool eoi_found;
+};
+
+
+static int camera_transport_stream_callback(
+    const uint8_t *data,
+    size_t length,
+    void *context
+)
+{
+    struct camera_transport_stream_state *state =
+        (struct camera_transport_stream_state *)context;
+
+    size_t send_length =
+        length;
+
+
+    for (
+        size_t i = 0;
+        i < length;
+        ++i
+    ) {
+
+        uint8_t value =
+            data[i];
+
+
+        if (
+            state->previous_valid &&
+            state->previous_byte == 0xFF &&
+            value == 0xD9
+        ) {
+
+            /*
+             * Include D9 itself, then stop before any FIFO padding.
+             */
+            send_length =
+                i + 1;
+
+            state->eoi_found =
+                true;
+
+            break;
+        }
+
+
+        state->previous_byte =
+            value;
+
+        state->previous_valid =
+            true;
+    }
+
+
+    if (send_length > 0) {
+
+        int ret =
+            state->sink->write(
+                data,
+                send_length,
+                state->sink->context
+            );
+
+        if (ret < 0) {
+
+            return ret;
+        }
+
+
+        state->bytes_sent +=
+            (uint32_t)send_length;
+    }
+
+
+    if (state->eoi_found) {
+
+        return 1;
+    }
+
+
+    /*
+     * Preserve the final byte for cross-chunk FF D9 detection.
+     */
+    if (length > 0) {
+
+        state->previous_byte =
+            data[length - 1];
+
+        state->previous_valid =
+            true;
+    }
+
+
+    return 0;
+}
+
+
+int camera_capture_and_stream(
+    const struct camera_stream_sink *sink
+)
+{
+    uint32_t fifo_length;
+
+    struct camera_transport_stream_state state = {
+        .sink = sink,
+        .bytes_sent = 0,
+        .previous_byte = 0,
+        .previous_valid = false,
+        .eoi_found = false
+    };
+
+    int ret;
+
+
+    if (
+        sink == NULL ||
+        sink->begin == NULL ||
+        sink->write == NULL ||
+        sink->end == NULL
+    ) {
+
+        printk(
+            "Camera stream sink is invalid\n"
+        );
+
+        return -1;
+    }
+
+
+    printk(
+        "\n=== 5MP BLE CAMERA CAPTURE ===\n"
+    );
+
+
+    ret =
+        camera_configure_auto_image_controls();
+
+    if (ret < 0) {
+
+        printk(
+            "Image controls failed\n"
+        );
+
+        return ret;
+    }
+
+
+    ret =
+        camera_configure_document_capture();
+
+    if (ret < 0) {
+
+        printk(
+            "High-quality configuration failed\n"
+        );
+
+        return ret;
+    }
+
+
+    ret =
+        camera_autofocus();
+
+    if (ret < 0) {
+
+        printk(
+            "Autofocus failed\n"
+        );
+
+        return ret;
+    }
+
+
+    printk(
+        "Autofocus phase complete - capturing 5MP frame\n"
+    );
+
+
+    ret =
+        camera_start_capture();
+
+    if (ret < 0) {
+
+        printk(
+            "5MP capture failed\n"
+        );
+
+        return ret;
+    }
+
+
+    ret =
+        camera_get_fifo_length(
+            &fifo_length
+        );
+
+    if (ret < 0) {
+
+        return ret;
+    }
+
+
+    printk(
+        "Camera FIFO length: %u bytes\n",
+        fifo_length
+    );
+
+
+    if (
+        fifo_length == 0 ||
+        fifo_length > 0x00FFFFFF
+    ) {
+
+        printk(
+            "Camera FIFO length invalid\n"
+        );
+
+        return -1;
+    }
+
+
+    ret =
+        sink->begin(
+            fifo_length,
+            sink->context
+        );
+
+    if (ret < 0) {
+
+        printk(
+            "Image transport begin failed: %d\n",
+            ret
+        );
+
+        return ret;
+    }
+
+
+    printk(
+        "Streaming JPEG until FF D9...\n"
+    );
+
+
+    ret =
+        camera_read_fifo(
+            fifo_length,
+            camera_transport_stream_callback,
+            &state
+        );
+
+    if (ret < 0) {
+
+        printk(
+            "JPEG stream failed: %d\n",
+            ret
+        );
+
+        return ret;
+    }
+
+
+    if (!state.eoi_found) {
+
+        printk(
+            "JPEG EOI marker was not found\n"
+        );
+
+        return -1;
+    }
+
+
+    printk(
+        "JPEG payload length: %u bytes\n",
+        state.bytes_sent
+    );
+
+
+    ret =
+        sink->end(
+            state.bytes_sent,
+            sink->context
+        );
+
+    if (ret < 0) {
+
+        printk(
+            "Image transport end failed: %d\n",
+            ret
+        );
+
+        return ret;
+    }
+
+
+    printk(
+        "5MP JPEG stream complete\n"
+    );
+
+    printk(
+        "================================\n"
+    );
+
 
     return 0;
 }
