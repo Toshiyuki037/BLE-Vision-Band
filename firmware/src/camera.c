@@ -1349,6 +1349,23 @@ int camera_capture_and_stream(
     }
 
 
+    /*
+     * At this point:
+     *   - autofocus has completed,
+     *   - camera_start_capture() has completed,
+     *   - the camera FIFO reports a valid non-zero JPEG length.
+     *
+     * The photograph therefore exists in the camera FIFO. Notify the
+     * product layer BEFORE starting the comparatively slow BLE transfer.
+     */
+    if (sink->capture_complete != NULL) {
+
+        sink->capture_complete(
+            sink->context
+        );
+    }
+
+
     ret =
         sink->begin(
             fifo_length,

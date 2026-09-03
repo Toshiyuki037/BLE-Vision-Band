@@ -179,7 +179,7 @@ static void play_event(
             break;
 
 
-        case HAPTIC_EVENT_CAPTURE_ACCEPTED:
+        case HAPTIC_EVENT_PHOTO_CAPTURED:
 
             (void)haptic_pulse(
                 HAPTIC_CAPTURE_MS

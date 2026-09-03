@@ -144,6 +144,7 @@ static uint32_t diag_notify_busy_retries = 0;
 static struct bt_conn *active_connection = NULL;
 
 static ble_connection_changed_cb_t connection_changed_callback = NULL;
+static ble_command_received_cb_t command_received_callback = NULL;
 
 
 static ssize_t rx_write(
@@ -575,11 +576,30 @@ static ssize_t rx_write(
                 "Could not send PONG notification\n"
             );
         }
+
+
+        return len;
+    }
+
+
+    /*
+     * Phase 7B:
+     *
+     * Forward product-level control commands to main.c instead of
+     * coupling BLE transport code directly to haptics or other product
+     * behavior. The callback must remain fast/non-blocking.
+     */
+    if (command_received_callback != NULL) {
+
+        command_received_callback(
+            data,
+            (size_t)len
+        );
     }
     else {
 
         printk(
-            "BLE command not recognized\n"
+            "BLE product command received but no callback is registered\n"
         );
     }
 
@@ -940,7 +960,8 @@ BT_CONN_CB_DEFINE(connection_callbacks) = {
 
 
 int ble_service_init(
-    ble_connection_changed_cb_t connection_changed_cb
+    ble_connection_changed_cb_t connection_changed_cb,
+    ble_command_received_cb_t command_received_cb
 )
 {
     int ret;
@@ -948,6 +969,9 @@ int ble_service_init(
 
     connection_changed_callback =
         connection_changed_cb;
+
+    command_received_callback =
+        command_received_cb;
 
 
     printk(

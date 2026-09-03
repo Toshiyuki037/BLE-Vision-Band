@@ -2,14 +2,14 @@
 #define HAPTICS_H
 
 /*
- * Vision Band Phase 6D haptic events.
+ * Vision Band semantic haptic events.
  *
  * Callers describe product events instead of motor timing. This keeps
  * main.c / BLE / camera code independent from DRV2605L register details.
  */
 enum haptics_event {
     HAPTIC_EVENT_BLE_CONNECTED = 0,
-    HAPTIC_EVENT_CAPTURE_ACCEPTED,
+    HAPTIC_EVENT_PHOTO_CAPTURED,
     HAPTIC_EVENT_IMAGE_SENT,
     HAPTIC_EVENT_RESULT_READY,
     HAPTIC_EVENT_ERROR

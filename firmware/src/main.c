@@ -4,6 +4,7 @@
 #include <zephyr/drivers/gpio.h>
 
 #include <stdbool.h>
+#include <string.h>
 
 #include "power_leds.h"
 #include "rgb_led.h"
@@ -106,6 +107,61 @@ static void handle_ble_connection_changed(bool connected)
 }
 
 
+
+/*
+ * ------------------------------------------------------------------
+ * BLE -> product control bridge.
+ *
+ * Phase 7B return path:
+ *
+ * Windows/OpenAI
+ *      -> CONTROL_RX "RESULT_READY"
+ *      -> ble_service.c
+ *      -> this callback
+ *      -> asynchronous DRV2605L result-ready haptic
+ *
+ * This callback executes from the BLE receive context, so it only
+ * queues haptic work and returns immediately.
+ * ------------------------------------------------------------------
+ */
+static void handle_ble_command(
+    const uint8_t *data,
+    size_t length
+)
+{
+    static const char result_ready_command[] =
+        "RESULT_READY";
+
+
+    if (
+        length ==
+            (sizeof(result_ready_command) - 1) &&
+        memcmp(
+            data,
+            result_ready_command,
+            sizeof(result_ready_command) - 1
+        ) == 0
+    ) {
+
+        printk(
+            "BLE command RESULT_READY received\n"
+        );
+
+        (void)haptics_play(
+            HAPTIC_EVENT_RESULT_READY
+        );
+
+        return;
+    }
+
+
+    printk(
+        "BLE product command not recognized (%u bytes)\n",
+        (unsigned int)length
+    );
+}
+
+
 /*
  * ------------------------------------------------------------------
  * Camera -> BLE transport bridge.
@@ -157,9 +213,32 @@ static int camera_ble_end(
 }
 
 
+/*
+ * Called by camera.c only after autofocus + sensor capture are complete
+ * and a valid JPEG exists in the Arducam FIFO, but before BLE upload.
+ *
+ * This haptic means exactly: "PHOTO CAPTURED — you can move now."
+ */
+static void camera_ble_capture_complete(
+    void *context
+)
+{
+    ARG_UNUSED(context);
+
+    printk(
+        "PHOTO CAPTURED: JPEG is ready in camera FIFO\n"
+    );
+
+    (void)haptics_play(
+        HAPTIC_EVENT_PHOTO_CAPTURED
+    );
+}
+
+
 static const struct camera_stream_sink ble_camera_sink = {
     .begin = camera_ble_begin,
     .write = camera_ble_write,
+    .capture_complete = camera_ble_capture_complete,
     .end = camera_ble_end,
     .context = NULL
 };
@@ -242,16 +321,6 @@ static void handle_short_press(void)
         "BUTTON1 short press: starting BLE camera capture\n"
     );
 
-    /*
-     * Immediate tactile acknowledgement that the short press was
-     * accepted. The haptic runs asynchronously while autofocus/capture
-     * begins.
-     */
-    (void)haptics_play(
-        HAPTIC_EVENT_CAPTURE_ACCEPTED
-    );
-
-
     ret =
         camera_capture_and_stream(
             &ble_camera_sink
@@ -287,17 +356,8 @@ static void handle_short_press(void)
 
 
     printk(
-        "Camera capture/export complete\n"
+        "Camera JPEG BLE transfer complete\n"
     );
-
-    /*
-     * camera_capture_and_stream() only returns success after the JPEG
-     * END frame has been handed successfully to the BLE transport.
-     */
-    (void)haptics_play(
-        HAPTIC_EVENT_IMAGE_SENT
-    );
-
 
     /*
      * Restore normal powered-on indicators.
@@ -411,7 +471,8 @@ int main(void)
 
     if (
         ble_service_init(
-            handle_ble_connection_changed
+            handle_ble_connection_changed,
+            handle_ble_command
         ) < 0
     ) {
 
