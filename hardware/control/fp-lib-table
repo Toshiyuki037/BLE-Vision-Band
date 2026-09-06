@@ -1,0 +1,5 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "MDBT53 Altium Library") (type "KiCad") (uri "C:/Users/patro/Downloads/MDBT53 & MDBT53-P & MDBT53-U Footprint & Design Guide (241021)/MDBT53 Footprint_Design Guide-241021/Footprint (nRF5340)_MDBT53-1M & P1M & U1M/MDBT53 Altium Library") (options "") (descr ""))
+	(lib (name "VisionBand_Custom") (type "KiCad") (uri "${KIPRJMOD}/VisionBand_Custom.pretty") (options "") (descr ""))
+)
