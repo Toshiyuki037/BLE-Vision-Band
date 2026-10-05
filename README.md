@@ -63,6 +63,13 @@ Motivated by the limitations of the Even Realities G2 Frames—specifically the 
 
 ---
 
+## DOCUMENTATION (BOM)
+
+A dated and recorded log of all my research and development.
+👉 https://app.notion.com/p/Vision-Band-3348546487d380519d59cf720e47a7b5
+
+---
+
 ## 📦 Bill of Materials (BOM)
 
 A detailed breakdown of all components, costs, and sourcing is available below:
@@ -161,7 +168,7 @@ Distributed under the MIT License.
 
 ## 📬 Contact
 
-Your Name
+
 GitHub: https://github.com/Toshiyuki037
 
 Project Link:
